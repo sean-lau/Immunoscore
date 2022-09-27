@@ -8,6 +8,6 @@ immunecellscounts <- as.matrix(Seurat::GetAssayData(seuratObj, slot = "counts"))
 write.csv(immunecellscounts,"~/Desktop/PatelLab/immunecellcounts.csv")
 
 #LAST STEP:
-#navigate to this website https://www.celltypist.org/ and have the option to upload csv file to their online server in order to run
-#cell typist. Also, you have the option to download CellTypist via Github for larger files; however, the online server worked 
-#well for the current matrix above (~500 MB took ~30 min). Received the 3 result files via email.
+#navigate to this website https://www.celltypist.org/ and upload csv file to their online server in order to run
+#cell typist. Also, you have the option to download CellTypist via Github and run the program on your own server for larger files; however, the online server worked 
+#well for the matrix above (~500 MB took ~30 min). Received the 3 result files via email.
