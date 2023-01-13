@@ -7,13 +7,10 @@ BiocManager::install("WGCNA")
 library(WGCNA)
 options(stringsAsFactors = FALSE)
 
-row.names(immune)
 
 load("~/Desktop/PatelLab/notumorseuratObj.Rdata")
 #Call in PanImmune gene panel
 PanGenes <- read.csv("~/Desktop/PatelLab/PanImmuneGeneSet/PanGenes.csv")
-#AddModuleScore
-
 sets<-levels(factor(PanGenes$SetName))
 
 ##gene sets with no matching genes "CD103pos_CD103neg_ratio_25446897" "GP11_Immune_IFN"   
@@ -64,6 +61,8 @@ net = blockwiseModules(metadf, maxBlockSize = 107,
                          saveTOMs = TRUE,
                          saveTOMFileBase = "immunecellTOM-blockwise",
                          verbose = 3)
+save(net, file = "~/Desktop/PatelLab/Analysis_Results/WGCNA/wgcna_results.rda")
+
 #visualizisation
 moduleLabels = net$colors
 
@@ -124,7 +123,6 @@ ggplot(data = sumdata, aes(x = datTrait, y = MEgreen))+
 
 #need to ask Dr. Harmanci about which regression models might work best
 #need to figure out gene signficance of each gene set in each module
-?substring()
 # names (colors) of the modules
 modNames = substring(names(MEs), 3)
 geneModuleMembership = as.data.frame(cor(metadf, MEs, use = "p"));
