@@ -13,6 +13,7 @@ install.packages('pheatmap')
 library(pheatmap)
 
 
+### 'sub' object can be produced by the Cluster_annotation.R
 #Create a matrix
 metadata<-sub@meta.data
 clusters<-levels(sub$seurat_clusters)
