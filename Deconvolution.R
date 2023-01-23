@@ -1,4 +1,9 @@
 ###Deconvolution Workspace
+##Note: actual deconvolution was performed on the Cibersort website. 
+#First, a signature matrix was created using the subset-matrix-Cibersort.txt file created below using the custom scRNA seq option.
+#Second, the cell fractions were imputed using the signature matrix from the first step and the bulkdata_unnormalized file. 
+#Code below should allow user to directly produce the files mentioned above; however, they are provided in the deconvolution data folder regardless. 
+
 #How many genes are in each module
 RepresentativeGenesets <- read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/RepresentativeGenesets.csv", header=FALSE)
 colnames(RepresentativeGenesets)<-c("Gene_Sets","Module")
