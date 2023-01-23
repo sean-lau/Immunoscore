@@ -1,6 +1,7 @@
 ##Novemeber Workspace 
 #remove tumor clusters 1, 3, 10, 15, 24, 8, 12, 16, 19
 
+## 'sub' object is produced by the Cluster_annotation.R
 clusters<-levels(sub$seurat_clusters)
 clusters<-clusters[c(-2,-4,-11,-16,-25, -9, -13, -17, -20)]
 immune<- subset(sub, cells=colnames(sub)[sub$seurat_clusters %in% clusters])
