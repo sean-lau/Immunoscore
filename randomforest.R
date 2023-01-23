@@ -43,11 +43,6 @@ train<-as.data.frame(train)
 
 train$TumorClass<-as.factor(train$TumorClass)
 
-#example
-library(dplyr)
-data_train <- read.csv("https://raw.githubusercontent.com/guru99-edu/R-Programming/master/train.csv")
-
-
 #data matrix
 data<-Moduledeconv
 
