@@ -4,7 +4,7 @@ install.packages("randomForest")
 library(randomForest)
 
 ##load in deconvolution data
-Moduledeconv<-Cibersort_Module_deconvolution
+Moduledeconv<-Cibersort_Module_deconvolution.csv
 ID<-row.names(newpredsamples)  ##newpredsamples can be found in deconvolution.R
 index<-""
 for(x in 1:length(ID)){
