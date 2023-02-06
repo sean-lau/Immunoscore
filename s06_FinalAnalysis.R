@@ -6,16 +6,17 @@
 #below were used to determine the samples that needed to be manually fixed. 
 
 #load InhouseMeningioma_Clippr_results and bulk sample data
-InhouseMeningioma_CLIPPR_results <- read.csv("InhouseMeningioma_CLIPPR_results.csv")
+InhouseMeningioma_CLIPPR_results <- read.csv("~/Desktop/PatelLab/FinalFigureAnalysis/InhouseMeningioma_CLIPPR_results.csv", row.names=1)
 load("~/Desktop/PatelLab/09192022_GE_RAW_Normalized_N330PrimarySamples_GeneSymbol.rda")
 
 
-newpred<-InhouseMeningioma_CLIPPR_results[,c(1,8)]
+#load in newpredsamples
+newpred<-InhouseMeningioma_CLIPPR_results[,c(1,7)]
 head(newpred)
-intersecting<-intersect(samples$Sample.Name, newpred$ID)
+intersecting<-intersect(samples$Sample.Name, row.names(newpred))
 index<-""
 for(x in 1:length(intersecting)){
-  index<-c(index,which(newpred$ID==intersecting[x]))
+  index<-c(index,which(row.names(newpred)==intersecting[x]))
 }
 index<-index[-1]
 index<-as.numeric(index)
@@ -35,19 +36,18 @@ samples<-samples[-index,]
 newpred<-newpred[c(-3,-4),]
 newpred$samplename<-samples[1:2,1]
 excludedsamples<-newpred
-##two samples whose names needed manually fixing. Two samples did not overlap with the samples from the bulk data
-InhouseMeningioma_CLIPPR_results[1,1]<-excludedsamples[1,3]
-InhouseMeningioma_CLIPPR_results[2,1]<-excludedsamples[2,3]
-
-##After above steps, InhouseMeningioma... should have all overlapping genes
+##two samples whose names needed manually fixing. The format of the original names was switched. 
+row.names(InhouseMeningioma_CLIPPR_results)[1]<-excludedsamples[1,3]
+row.names(InhouseMeningioma_CLIPPR_results)[2]<-excludedsamples[2,3]
+##After above steps, InhouseMeningioma... should have all overlapping samples. Steps below require the modified version of InhouseMeningioma
 ##reload sample data
 load("~/Desktop/PatelLab/09192022_GE_RAW_Normalized_N330PrimarySamples_GeneSymbol.rda")
 #continue analysis
-newpred<-InhouseMeningioma_CLIPPR_results[,c(1,2,8)]
+newpred<-InhouseMeningioma_CLIPPR_results[,c(1,7)]
 samples$rowname<-row.names(samples)
+newpred$ID<-row.names(newpred)
 newpredsamples<-merge(samples,newpred, by.x = "Sample.Name", by.y = "ID")
 row.names(newpredsamples)<-newpredsamples$rowname
-table(newpredsamples$Sample.Name)
 
 ###EXTRA CHECKPOINT (NOT necessary for main code)
 #Samples with repeat names 16-01-031 (2),18-01-010 (2), 19-01-094 (2), 20-01-027 (3)
