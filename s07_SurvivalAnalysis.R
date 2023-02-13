@@ -34,19 +34,25 @@ survivaldata$Vital.Status<-as.numeric(survivaldata$Vital.Status)
 survivaldata$Recurrence.Free.Time[survivaldata$Recurrence.Free.Time=="#NUM!"]<-NA
 survivaldata$Recurrence.Free.Time[survivaldata$Recurrence.Free.Time==""]<-NA
 survivaldata$Recurrence.Free.Time<-as.numeric(survivaldata$Recurrence.Free.Time)
+survivaldata$Recurrence.Free.Time<-survivaldata$Recurrence.Free.Time/12
 
+survivaldata<-survivaldata[-which(survivaldata$Recurrence==""),]
+survivaldata<-survivaldata[-which(survivaldata$Recurrence=="n/a"),]
+survivaldata$Recurrence<-gsub("N", 0, survivaldata$Recurrence)
+survivaldata$Recurrence<-gsub("Y", 1, survivaldata$Recurrence)
+survivaldata$Recurrence<-as.numeric(survivaldata$Recurrence)
 
 #Survival analysis
-sfit<-survfit(Surv(Recurrence.Free.Time, Vital.Status)~TumorClass, data = survivaldata)
+sfit<-survfit(Surv(Recurrence.Free.Time, Recurrence)~TumorClass, data = survivaldata)
 table(survivaldata$TumorClass, survivaldata$Vital.Status)
 ggsurvplot(sfit)+
-  labs(title = "Random Forest Prediction Survival Plot", x = "Time (Months)")
+  labs(title = "Random Forest Prediction Survival Plot", x = "Time (Years)", y = "Recurrence Survival Probability")
 
 summary(sfit)
 
-########
-#################
-######################
+######################################################################################################################
+###############################################################################################################################
+####################################################################################################################################
 #repeat above steps but with BCM predictions
 #load in data sets: BCM classifications and Patient data
 SeqTumorClinicalData_12_30_22_anon <- read.csv("~/Desktop/PatelLab/SeqTumorClinicalData_12_30_22 anon.csv")
@@ -108,14 +114,127 @@ survivaldata$Vital.Status<-as.numeric(survivaldata$Vital.Status)
 survivaldata$Recurrence.Free.Time[survivaldata$Recurrence.Free.Time=="#NUM!"]<-NA
 survivaldata$Recurrence.Free.Time[survivaldata$Recurrence.Free.Time==""]<-NA
 survivaldata$Recurrence.Free.Time<-as.numeric(survivaldata$Recurrence.Free.Time)
+survivaldata$Recurrence.Free.Time<-survivaldata$Recurrence.Free.Time/12
+
+table(survivaldata$Recurrence)
+survivaldata<-survivaldata[-which(survivaldata$Recurrence==""),]
+survivaldata<-survivaldata[-which(survivaldata$Recurrence=="n/a"),]
+survivaldata$Recurrence<-gsub("N", 0, survivaldata$Recurrence)
+survivaldata$Recurrence<-gsub("Y", 1, survivaldata$Recurrence)
+survivaldata$Recurrence<-as.numeric(survivaldata$Recurrence)
+
 
 #Survival analysis
-sfit<-survfit(Surv(Recurrence.Free.Time, Vital.Status)~TumorClass, data = survivaldata)
+sfit<-survfit(Surv(Recurrence.Free.Time, Recurrence)~TumorClass, data = survivaldata)
 table(survivaldata$TumorClass, survivaldata$Vital.Status)
 
-r <- ggsurvplot(sfit)+ ###For ggsurvplot to work, make sure the vital status variable is not factored i.e. don't use as.factor() or unfactor the variable
-  labs(title = "BCM Prediction Tumor Class Survival Plot", x = "Time (Months)")
+ggsurvplot(sfit)+ ###For ggsurvplot to work, make sure the vital status variable is not factored i.e. don't use as.factor() or unfactor the variable
+  labs(title = "BCM Prediction Tumor Class Survival Plot", x = "Time (Years)", y = "Recurrence Survival Probability")
 setwd("~/Desktop/PatelLab/FinalFigureAnalysis/")
-ggsave('BCMprediction_tumorclass_survivalplot.pdf', plot = r, width=15, height=10)
 
-?ggsurvplot
+
+
+##########Survival Data split up by modules########################################################################
+################################################################################################################################################
+#load in patient data
+SeqTumorClinicalData_12_30_22_anon <- read.csv("~/Desktop/PatelLab/SeqTumorClinicalData_12_30_22 anon.csv")
+
+#load in module data
+Moduledeconv<-read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/Cibersort_Module_deconvolution.csv")
+Moduledeconv<-Moduledeconv[,1:6]
+
+#need to switch format of sample names in patient data to match sample names in module ratios
+#load in bulk sample data which has both formatted names
+load("~/Desktop/PatelLab/09192022_GE_RAW_Normalized_N330PrimarySamples_GeneSymbol.rda")
+
+Names<-data.frame("Short" = samples$Sample.Name, "Long" = row.names(samples))
+
+formatpatient<-merge(Names, SeqTumorClinicalData_12_30_22_anon, by.x = "Short", by.y = "Sample.Name")
+which(colnames(formatpatient)=="Recurrence")
+formatpatient<-formatpatient[,c(1,2,25,27,31)]
+
+#transform module ratios into z-scale
+Moduledeconv[2:6] <- t(scale(t(Moduledeconv[2:6])))
+
+#rename modules C1: turq, C2: blue, C3: green, C4: yellow, C5: brown
+newmodulenames<-c("Mixture","C1", "C2", "C3", "C4", "C5")
+colnames(Moduledeconv)<-newmodulenames
+
+#combine module ratios with patient vital data
+survivaldata<-merge(formatpatient, Moduledeconv, by.x = "Long", by.y = "Mixture")
+
+#assign long label names to row.names
+row.names(survivaldata)<-survivaldata$Long
+survivaldata<-survivaldata[,c(-1,-2)]
+
+#Clean up survival data
+table(survivaldata$Vital.Status)
+survivaldata<-survivaldata[-which(survivaldata$Vital.Status=="Lost to Follow-up"),]
+survivaldata<-survivaldata[-which(survivaldata$Vital.Status==""),]
+survivaldata$Vital.Status<-gsub("alive", "Alive", survivaldata$Vital.Status)
+survivaldata$Vital.Status<-gsub("ALive", "Alive", survivaldata$Vital.Status)
+survivaldata$Vital.Status<-gsub("Alive", 0, survivaldata$Vital.Status)
+survivaldata$Vital.Status<-gsub("Dead", 1, survivaldata$Vital.Status)
+survivaldata$Vital.Status<-as.numeric(survivaldata$Vital.Status)
+
+
+survivaldata$Recurrence.Free.Time[survivaldata$Recurrence.Free.Time=="#NUM!"]<-NA
+survivaldata$Recurrence.Free.Time[survivaldata$Recurrence.Free.Time==""]<-NA
+survivaldata$Recurrence.Free.Time<-as.numeric(survivaldata$Recurrence.Free.Time)
+survivaldata$Recurrence.Free.Time<-survivaldata$Recurrence.Free.Time/12
+
+survivaldata<-survivaldata[-which(survivaldata$Recurrence==""),]
+survivaldata<-survivaldata[-which(survivaldata$Recurrence=="n/a"),]
+survivaldata$Recurrence<-gsub("N", 0, survivaldata$Recurrence)
+survivaldata$Recurrence<-gsub("Y", 1, survivaldata$Recurrence)
+survivaldata$Recurrence<-as.numeric(survivaldata$Recurrence)
+
+
+# set Z-scale cut-offs for high and low expression
+highExpr <- 1.0
+lowExpr <- -1.0
+survivaldata$C1 <- ifelse(survivaldata$C1 >= highExpr, 'High',
+                              ifelse(survivaldata$C1 <= lowExpr, 'Low', 'Mid'))
+survivaldata$C2 <- ifelse(survivaldata$C2 >= highExpr, 'High',
+                             ifelse(survivaldata$C2 <= lowExpr, 'Low', 'Mid'))
+survivaldata$C3 <- ifelse(survivaldata$C3 >= highExpr, 'High',
+                          ifelse(survivaldata$C3 <= lowExpr, 'Low', 'Mid'))
+survivaldata$C4 <- ifelse(survivaldata$C4 >= highExpr, 'High',
+                          ifelse(survivaldata$C4 <= lowExpr, 'Low', 'Mid'))
+survivaldata$C5 <- ifelse(survivaldata$C5 >= highExpr, 'High',
+                          ifelse(survivaldata$C5 <= lowExpr, 'Low', 'Mid'))
+#C1 survival plot
+
+sfit<-survfit(Surv(Recurrence.Free.Time, Recurrence)~C1, data = survivaldata)
+
+ggsurvplot(sfit)+ ###For ggsurvplot to work, make sure the vital status variable is not factored i.e. don't use as.factor() or unfactor the variable
+  labs(title = "Module C1 Survival Plot", x = "Time (Years)", y = "Recurrence Survival Probability")
+
+#C2 survival plot
+
+sfit<-survfit(Surv(Recurrence.Free.Time, Recurrence)~C2, data = survivaldata)
+
+ggsurvplot(sfit)+ ###For ggsurvplot to work, make sure the vital status variable is not factored i.e. don't use as.factor() or unfactor the variable
+  labs(title = "Module C2 Survival Plot", x = "Time (Years)", y = "Recurrence Survival Probability")
+#C3 survival plot
+
+sfit<-survfit(Surv(Recurrence.Free.Time, Recurrence)~C3, data = survivaldata)
+
+ggsurvplot(sfit)+ ###For ggsurvplot to work, make sure the vital status variable is not factored i.e. don't use as.factor() or unfactor the variable
+  labs(title = "Module C3 Survival Plot", x = "Time (Years)", y = "Recurrence Survival Probability")
+#C4 survival plot
+
+sfit<-survfit(Surv(Recurrence.Free.Time, Recurrence)~C4, data = survivaldata)
+
+ggsurvplot(sfit)+ ###For ggsurvplot to work, make sure the vital status variable is not factored i.e. don't use as.factor() or unfactor the variable
+  labs(title = "Module C4 Survival Plot", x = "Time (Years)", y = "Recurrence Survival Probability")
+#C5 survival plot
+
+sfit<-survfit(Surv(Recurrence.Free.Time, Recurrence)~C5, data = survivaldata)
+
+ggsurvplot(sfit)+ ###For ggsurvplot to work, make sure the vital status variable is not factored i.e. don't use as.factor() or unfactor the variable
+  labs(title = "Module C5 Survival Plot", x = "Time (Years)", y = "Recurrence Survival Probability")
+
+
+
+
