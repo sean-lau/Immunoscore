@@ -216,7 +216,7 @@ plot.bulk.vs.sc (sc.input = sc.dat.filtered,
 sc.dat.filtered.pc <-  select.gene.type (sc.dat.filtered,
                                          gene.type = "protein_coding")
 
-#filter for significant genes
+#filter for significant genes to decrease cpu load
 diff.exp.stat <- get.exp.stat(sc.dat=sc.dat.filtered.pc[,colSums(sc.dat.filtered.pc>0)>3],# filter genes to reduce memory use
                               cell.type.labels=celltype,
                               cell.state.labels=cellstate,
