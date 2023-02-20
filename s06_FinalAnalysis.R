@@ -1,7 +1,7 @@
 #Create final figures
 #This is final analysis 
 
-##use new prediction annotation for tumor clouse from "InhouseMeningioma_CLIPPR..."
+##use new prediction annotation for tumor class from "InhouseMeningioma_CLIPPR..."
 #need to merge new predictions with old data set. Not all names in either set were congruent. Steps
 #below were used to determine the samples that needed to be manually fixed. 
 
@@ -57,6 +57,7 @@ subset$predictions_meta_class
 #not an issue. The ID's are the same for different bulk samples because they are likely from the same patient
 
 ##pheatmap analysis
+##Cibersort Deconvolution
 Moduledeconv<-read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/Cibersort_Module_deconvolution.csv")
 Moduledeconv<-Moduledeconv[,1:6]
 ID<-row.names(newpredsamples)
@@ -73,9 +74,28 @@ Moduledeconv<-Moduledeconv[,-1]
 Moduledeconv<-t(Moduledeconv)
 
 #rename modules C1: turq, C2: blue, C3: green, C4: yellow, C5: brown
-newmodulenames<-c("C1", "C2", "C3", "C4", "C5")
+newmodulenames<-c("C1_Cibersort", "C2_Cibersort", "C3_Cibersort", "C4_Cibersort", "C5_Cibersort")
 row.names(Moduledeconv)<-newmodulenames
 
+#load in bayesprism deconvolution
+bayesprism_deconvolution <- read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/bayesprism_deconvolution.csv", row.names=1)
+bpmodulenames<-c("C1_BP", "C2_BP", "C3_BP", "C4_BP", "C5_BP")
+colnames(bayesprism_deconvolution)<-bpmodulenames
+
+#merge bayes prism and cibersort deconvolution
+Moduledeconv<-t(Moduledeconv)
+Moduledeconv<-as.data.frame(Moduledeconv)
+Moduledeconv$rownames<-row.names(Moduledeconv)
+
+bayesprism_deconvolution$rownames<-row.names(bayesprism_deconvolution)
+
+Moduledeconv<-merge(Moduledeconv, bayesprism_deconvolution, by.x = "rownames", by.y = "rownames")
+
+row.names(Moduledeconv)<-Moduledeconv$rownames
+Moduledeconv<-Moduledeconv[,-1]
+
+Moduledeconv<-t(Moduledeconv)
+  
 #new prediction annotations
 sampleclass<-as.data.frame(newpredsamples$predictions_meta_class)
 row.names(sampleclass)<-row.names(newpredsamples)
@@ -97,32 +117,25 @@ names(Names)<-c("datelab", "mainlab"
 recover<-merge(recover,Names, by.x = "Sample.Name", by.y = "datelab")
 row.names(recover)<-recover$mainlab
 #subset Moduledeconv to only those in the recover freetime annotations
-Moduledeconv<-read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/Cibersort_Module_deconvolution.csv")
-Moduledeconv<-Moduledeconv[,1:6]
+Moduledeconvindex<-read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/Cibersort_Module_deconvolution.csv")
+Moduledeconvindex<-Moduledeconvindex[,1:6]
 ID<-row.names(recover)
 index<-""
 for(x in 1:length(ID)){
-  index<-c(index, which(Moduledeconv[,1]==ID[x]))
+  index<-c(index, which(Moduledeconvindex[,1]==ID[x]))
 }
 index<-index[-1]
 index<-as.numeric(index)
-Moduledeconv<-Moduledeconv[index,]
+Moduledeconv<-Moduledeconv[,index]
 
-row.names(Moduledeconv)<-Moduledeconv[,1]
-Moduledeconv<-Moduledeconv[,-1]
-Moduledeconv<-t(Moduledeconv)
-
-#rename modules C1: turq, C2: blue, C3: green, C4: yellow, C5: brown
-newmodulenames<-c("C1", "C2", "C3", "C4", "C5")
-row.names(Moduledeconv)<-newmodulenames
 
 ##clean up recover data frame
 recover<-recover[,c(-1,-3)]
 recover<-as.data.frame(recover)
 row.names(recover)<-colnames(Moduledeconv)
-colnames(recover)<-"Recover Time"
-recover$`Recover Time`<-as.numeric(recover$`Recover Time`)
-class(recover$`Recover Time`)
+colnames(recover)<-"Recurrence Free Time"
+recover$`Recurrence Free Time`<-as.numeric(recover$`Recurrence Free Time`)
+class(recover$`Recurrence Free Time`)
 
 
 ########add tumor class and randomforest predictions to recover
@@ -157,7 +170,45 @@ breaks <- seq(-2, 2, length = 16)
 color <- colorRampPalette(rev(brewer.pal(11,'RdBu')))(length(breaks))
 annoCol<-list(TumorClass=c(A='#28A860', B ='#0042ED', C='#FE4733'),Randomforest_ClassPred=c(A='#28A860', B ='#0042ED', C='#FE4733') )
 
+?pheatmap(0)
 r<-pheatmap(Moduledeconv, annotation_col = recovertumorclass, scale = "row", color = color, breaks = breaks, fontsize = 8, 
-            labels_col = shortbulknames, annotation_colors = annoCol)
+            labels_col = shortbulknames, annotation_colors = annoCol, cluster_rows = F)
 setwd("~/Desktop/PatelLab/FinalFigureAnalysis/")
 ggsave('heatmap_modulebulkdata_deconvolution_withrecover.pdf', plot = r, width=30, height=5)
+
+###Create geom boxplot (ggplot: facet_wrap with C1_Ciber, C1_BP, ... ###################################################
+#ALSO x-axis with my Tumor classes, and y axis the ratios?#############################################################
+#add tumorclass 
+Moduledeconv<-t(Moduledeconv)
+neworder<-(sort(row.names(Moduledeconv)))
+Moduledeconv<-Moduledeconv[neworder,]
+
+neworder<-(sort(row.names(recovertumorclass)))
+recovertumorclass<-recovertumorclass[neworder,]
+Moduledeconv<-as.data.frame(Moduledeconv)
+
+Moduledeconv$tumorclass<-as.factor(recovertumorclass$TumorClass)
+
+#create new dataframe with three columns only: ratios, tumorclass, and module/software
+for(x in 1:10){
+  if(x ==1){
+  boxplotdf<-data.frame("Ratios" = Moduledeconv[,x], "TumorClass" = Moduledeconv[,11], 
+                        "Module_Program" = rep(colnames(Moduledeconv)[x], nrow(Moduledeconv)))
+  }else{ 
+    new<-data.frame("Ratios" = Moduledeconv[,x], "TumorClass" = Moduledeconv[,11], 
+                    "Module_Program" = rep(colnames(Moduledeconv)[x], nrow(Moduledeconv)))
+    boxplotdf<-rbind(boxplotdf, new)
+  }
+}
+
+
+#create boxplot
+library(ggplot2)
+# Basic box plot
+b<-ggplot(boxplotdf, aes(x=TumorClass, y=Ratios, fill = TumorClass)) + 
+  geom_boxplot()+ facet_wrap(~ Module_Program) + labs(x = "Tumor Class", y = "Deconvolution Ratios")+
+  scale_fill_manual(values=c('#28A860','#0042ED','#FE4733'))+
+  theme(legend.position = "none")
+
+setwd("~/Desktop/PatelLab/FinalFigureAnalysis/")
+ggsave('boxplot_deconvolutionmodulesbyclass.pdf', plot = b, width=10, height=8)
