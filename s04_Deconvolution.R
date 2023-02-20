@@ -36,7 +36,8 @@ length(unique(turq$Genes))
 length(unique(yellow$Genes))
 length(unique(green$Genes))
 
-###################Bulk Sequence
+###################Bulk Sequence############################################################
+####################################################################################################
 ##load in bulk sample data
 load("~/Desktop/PatelLab/09192022_GE_RAW_Normalized_N330PrimarySamples_GeneSymbol.rda")
 GS<-row.names(data_GS)
@@ -44,12 +45,12 @@ intergenes<-intersect(GS, Genesinmodules$Genes)
 #which(row.names(normalized_data_GS)==intergenes)
 genename_index<-""
 for(x in 1:length(intergenes)){
-  genename_index<-c(genename_index,which(row.names(normalized_data_GS)==intergenes[x]))
+  genename_index<-c(genename_index,which(row.names(data_GS)==intergenes[x]))
 }
 genename_index<-genename_index[-1]
 genename_index<-as.numeric(genename_index)
 
-modulegenes_data<-normalized_data_GS[genename_index,]
+modulegenes_data<-data_GS[genename_index,]
 
 #Add module column to modulegenes_data
 genename_index<-""
@@ -107,15 +108,19 @@ load("~/Desktop/PatelLab/Analysis_Results/Deconvolution/seurat_significantimmune
 immunecellscounts <- as.matrix(Seurat::GetAssayData(sigimmune, slot = "counts"))
 
 #cell type labels vector
-celltype<-sigimmune$TumorType
+celltype<-sigimmune$representativemodule
 
 #cell state label vector
-cellstate<-sigimmune$representativemodule
+cellstate<-sigimmune$TumorType
 
-table(cbind.data.frame(cellstate, celltype))
+#rename modules C1: turq, C2: blue, C3: green, C4: yellow, C5: brown
+celltype<-gsub("turquoise", "C1", celltype)
+celltype<-gsub("blue", "C2", celltype)
+celltype<-gsub("green", "C3", celltype)
+celltype<-gsub("yellow", "C4", celltype)
+celltype<-gsub("brown", "C5", celltype)
 
-#save bulk data to input into Cibersort
-write.table(data_GS, file = "~/Desktop/PatelLab/Analysis_Results/Deconvolution/bulkdata_unnormalized.txt", quote = F, sep = "\t")
+
 
 ##Subset the single cell data by the genes in the modules. Not all genes in single cell data were 
 #included in modules by WGCNA.
@@ -131,10 +136,130 @@ for(x in 1:length){
 geneindex<-geneindex[-1]
 geneindex<-as.numeric(geneindex)
 subset.matrix <- immunecellscounts[geneindex, ] # Pull the raw expression matrix from the original Seurat object containing only the genes of interest
+
+###Cibersort data input ############################################################################  
+######################################################################################################
 colnames(subset.matrix)<-sigimmune$representativemodule
+#save bulk data to input into Cibersort
+write.table(data_GS, file = "~/Desktop/PatelLab/Analysis_Results/Deconvolution/bulkdata_unnormalized.txt", quote = F, sep = "\t")
 #write table to input into cibersort
 write.table(subset.matrix, file = "~/Desktop/PatelLab/Analysis_Results/Deconvolution/subset.matrix.Cibersort.txt", quote = F, sep = "\t")
 
+
+###Bayes Prism##########################################################################################
+########################################################################################################
+library(BayesPrism)
+
+##need to split up cell states within the cell types
+
+for(x in 1:length(cellstate)){
+  cellstate[x]<-paste0(celltype[x],"_",cellstate[x])
+}
+
+table(cbind.data.frame(cellstate, celltype))
+
+
+#transpose bulk and sc data
+data_GS<-t(data_GS)
+subset.matrix<-t(subset.matrix)
+
+
+#identify whether cell states and types are of quality
+plot.cor.phi(input=subset.matrix,
+              input.labels=cellstate,
+              title="cell state correlation",
+              #specify pdf.prefix if need to output to pdf
+              #pdf.prefix="gbm.cor.cs", 
+              cexRow=0.2, cexCol=0.2,
+              margins=c(2,2))
+
+plot.cor.phi(input=subset.matrix, 
+              input.labels=celltype, 
+              title="cell type correlation",
+              #specify pdf.prefix if need to output to pdf
+              #pdf.prefix="gbm.cor.ct",
+              cexRow=0.5, cexCol=0.5,
+)
+
+#filter outlier genes
+sc.stat <- plot.scRNA.outlier(
+  input=subset.matrix, #make sure the colnames are gene symbol or ENSMEBL ID 
+  cell.type.labels=celltype,
+  species="hs", #currently only human(hs) and mouse(mm) annotations are supported
+  return.raw=TRUE #return the data used for plotting. 
+  #pdf.prefix="gbm.sc.stat" specify pdf.prefix if need to output to pdf
+)
+
+bk.stat <- plot.bulk.outlier(
+  bulk.input=data_GS,#make sure the colnames are gene symbol or ENSMEBL ID 
+  sc.input=subset.matrix, #make sure the colnames are gene symbol or ENSMEBL ID 
+  cell.type.labels=celltype,
+  species="hs", #currently only human(hs) and mouse(mm) annotations are supported
+  return.raw=TRUE
+  #pdf.prefix="gbm.bk.stat" specify pdf.prefix if need to output to pdf
+)
+
+sc.dat.filtered <- cleanup.genes (input=subset.matrix,
+                                  input.type="count.matrix",
+                                  species="hs", 
+                                  gene.group=c( "Rb","Mrp","other_Rb","chrM","MALAT1") ,
+                                  exp.cells=5)
+
+###number of genes filtered in each category: 
+#Rb      Mrp other_Rb     chrM   MALAT1 
+#0        0        0        0        0 
+#A total of  0  genes from Rb Mrp other_Rb chrM MALAT1  have been excluded 
+#A total of  9  gene expressed in fewer than  5  cells have been excluded 
+
+#checking for concordance of expression for different types of genes
+plot.bulk.vs.sc (sc.input = sc.dat.filtered,
+                 bulk.input = data_GS
+                 #pdf.prefix="gbm.bk.vs.sc" specify pdf.prefix if need to output to pdf
+)
+
+#mainly only see concordance among protein coding, so filter for protein coding genes
+sc.dat.filtered.pc <-  select.gene.type (sc.dat.filtered,
+                                         gene.type = "protein_coding")
+
+#filter for significant genes
+diff.exp.stat <- get.exp.stat(sc.dat=sc.dat.filtered.pc[,colSums(sc.dat.filtered.pc>0)>3],# filter genes to reduce memory use
+                              cell.type.labels=celltype,
+                              cell.state.labels=cellstate,
+                              psuedo.count=0.1, #a numeric value used for log2 transformation. =0.1 for 10x data, =10 for smart-seq. Default=0.1.
+                              cell.count.cutoff=50, # a numeric value to exclude cell state with number of cells fewer than this value for t test. Default=50.
+                              n.cores=1 #number of threads
+)
+
+sc.dat.filtered.pc.sig <- select.marker(sc.dat=sc.dat.filtered.pc,
+                                         stat=diff.exp.stat,
+                                         pval.max=0.01,
+                                         lfc.min=0.1)
+
+#create bayes prism object
+myPrism <- new.prism(
+  reference=sc.dat.filtered.pc.sig, 
+  mixture=data_GS,
+  input.type="count.matrix", 
+  cell.type.labels = celltype, 
+  cell.state.labels = cellstate,
+  key= NULL,
+  outlier.cut=0.01,
+  outlier.fraction=0.1,
+)
+
+
+#run bayes prism
+bp.res <- run.prism(prism = myPrism, n.cores=50)
+
+#Downstream analysis
+bpratios <- get.fraction (bp=bp.res,
+                       which.theta="final",
+                       state.or.type="type")
+write.csv(bpratios, file = "~/Desktop/PatelLab/Analysis_Results/Deconvolution/bayesprism_deconvolution.csv")
+
+
+#Cibersort analysis################################################################################
+########################################################################################################
 #create a pheatmap with both LM22 and Module ratios
 Cibserort_deconvolution_LM22_bulk <- read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/Cibserort_deconvolution_LM22_bulk.csv")
 Cibersort_Module_deconvolution <- read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/Cibersort_Module_deconvolution.csv")
