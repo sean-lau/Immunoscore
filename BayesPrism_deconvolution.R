@@ -1,7 +1,4 @@
-###Bayes Prism Run
 ###Deconvolution Workspace
-
-#data cleaning
 #How many genes are in each module
 RepresentativeGenesets <- read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/RepresentativeGenesets.csv", header=FALSE)
 colnames(RepresentativeGenesets)<-c("Gene_Sets","Module")
@@ -41,19 +38,23 @@ length(unique(green$Genes))
 
 ###################Bulk Sequence############################################################
 ####################################################################################################
-##load in bulk sample data
+##load in BCM bulk sample data
 load("~/Desktop/PatelLab/09192022_GE_RAW_Normalized_N330PrimarySamples_GeneSymbol.rda")
+#hongkong data
+load("~/Desktop/PatelLab/031023_Inhouse_Raleigh_Hongkong_GeneSymbol.rda")
+data_GS<-data.frame(data_GS, data)
 GS<-row.names(data_GS)
+
 intergenes<-intersect(GS, Genesinmodules$Genes)
 #which(row.names(normalized_data_GS)==intergenes)
 genename_index<-""
 for(x in 1:length(intergenes)){
-  genename_index<-c(genename_index,which(row.names(normalized_data_GS)==intergenes[x]))
+  genename_index<-c(genename_index,which(row.names(data_GS)==intergenes[x]))
 }
 genename_index<-genename_index[-1]
 genename_index<-as.numeric(genename_index)
 
-modulegenes_data<-normalized_data_GS[genename_index,]
+modulegenes_data<-data_GS[genename_index,]
 
 #Add module column to modulegenes_data
 genename_index<-""
@@ -90,45 +91,41 @@ modules<-rbind(nonmulti,multi)
 row.names(modules)<-modules$Genes
 modules<-modules[-1]
 
-
 #Extract class data for samples
 bulkdataclass<-data.frame(samples$class)
 row.names(bulkdataclass)<-row.names(samples)
 colnames(bulkdataclass)<-"TumorClass"
 
-#Heat Map
-library(pheatmap)
-library(RColorBrewer)
-breaks <- seq(-2, 2, length = 16)
-color <- colorRampPalette(rev(brewer.pal(11,'RdBu')))(length(breaks))
-pheatmap(modulegenes_data, annotation_col = bulkdataclass, annotation_row = modules, show_rownames = F, show_colnames = F, scale = "row",
-         color= color,breaks = breaks)
+#hongkong class data
+hkclass<-samplesheet$class
+hkclass<-as.data.frame(hkclass)
+names(hkclass)<-"TumorClass"
+row.names(hkclass)<-row.names(samplesheet)
 
-#load in single cell data after WGCNA analysis
-load("~/Desktop/PatelLab/Analysis_Results/Deconvolution/seurat_significantimmunecells.rda")
+#combine class data from both data sets
+bulkdataclass<-rbind(bulkdataclass, hkclass)
+
+
+
+#load in single cell data after subtype clustering
+load("~/Desktop/PatelLab/Analysis_Results/Deconvolution/subtypecluster_cells.rda")
 
 #Load in single cell data matrix
-immunecellscounts <- as.matrix(Seurat::GetAssayData(sigimmune, slot = "counts"))
+immunecellscounts <- as.matrix(Seurat::GetAssayData(subclustcells, slot = "counts"))
+
 
 #cell type labels vector
-celltype<-sigimmune$representativemodule
+#load in cluster data
+celltype<-subclustcells$subtypecluster
 
 #cell state label vector
-cellstate<-sigimmune$TumorType
-
-#rename modules C1: turq, C2: blue, C3: green, C4: yellow, C5: brown
-celltype<-gsub("turquoise", "C1", celltype)
-celltype<-gsub("blue", "C2", celltype)
-celltype<-gsub("green", "C3", celltype)
-celltype<-gsub("yellow", "C4", celltype)
-celltype<-gsub("brown", "C5", celltype)
-
+cellstate<-subclustcells$TumorType
 
 
 ##Subset the single cell data by the genes in the modules. Not all genes in single cell data were 
 #included in modules by WGCNA.
 subsetgenes<-unique(Genesinmodules$Genes)
-immunecellscounts <- as.matrix(Seurat::GetAssayData(sigimmune, slot = "counts"))
+immunecellscounts <- as.matrix(Seurat::GetAssayData(subclustcells, slot = "counts"))
 #create index of genes to subset matrix
 geneindex <- ""
 matrixgenes<-row.names(immunecellscounts)
@@ -245,4 +242,6 @@ myPrism <- new.prism(
 
 #run bayes prism
 bp.res <- run.prism(prism = myPrism, n.cores=50)
+
+
 
