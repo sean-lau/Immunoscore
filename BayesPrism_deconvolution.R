@@ -1,6 +1,6 @@
 ###Deconvolution Workspace
 #How many genes are in each module
-RepresentativeGenesets <- read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/RepresentativeGenesets.csv", header=FALSE)
+RepresentativeGenesets <- read.csv("~/Desktop/PatelLab/NewAnalysis/RepresentativeGenesets.csv", header=FALSE)
 colnames(RepresentativeGenesets)<-c("Gene_Sets","Module")
 
 #Call in PanImmune gene panel
@@ -25,16 +25,16 @@ length(unique(Genesinmodules$Genes))
 length(unique(PanGenes$Gene))
 
 #create dataframe with unique genes note: some modules had repeats of genes
-blue<-Genesinmodules[Genesinmodules$Module == "Blue",]
-brown<-Genesinmodules[Genesinmodules$Module == "Brown",]
-turq<-Genesinmodules[Genesinmodules$Module == "Turquoise",]
-yellow<-Genesinmodules[Genesinmodules$Module == "Yellow",]
-green<-Genesinmodules[Genesinmodules$Module == "Green",]
-length(unique(blue$Genes))
-length(unique(brown$Genes))
-length(unique(turq$Genes))
-length(unique(yellow$Genes))
-length(unique(green$Genes))
+C1<-Genesinmodules[Genesinmodules$Module == "C1",]
+C2<-Genesinmodules[Genesinmodules$Module == "C2",]
+C3<-Genesinmodules[Genesinmodules$Module == "C3",]
+C4<-Genesinmodules[Genesinmodules$Module == "C4",]
+C5<-Genesinmodules[Genesinmodules$Module == "C5",]
+length(unique(C1$Genes))
+length(unique(C2$Genes))
+length(unique(C3$Genes))
+length(unique(C4$Genes))
+length(unique(C5$Genes))
 
 ###################Bulk Sequence############################################################
 ####################################################################################################
@@ -42,9 +42,9 @@ length(unique(green$Genes))
 load("~/Desktop/PatelLab/09192022_GE_RAW_Normalized_N330PrimarySamples_GeneSymbol.rda")
 #hongkong data
 load("~/Desktop/PatelLab/031023_Inhouse_Raleigh_Hongkong_GeneSymbol.rda")
-data_GS<-data.frame(data_GS, data)
-GS<-row.names(data_GS)
+data_GS<-data
 
+GS<-row.names(data_GS)
 intergenes<-intersect(GS, Genesinmodules$Genes)
 #which(row.names(normalized_data_GS)==intergenes)
 genename_index<-""
@@ -66,10 +66,16 @@ genename_index<-as.numeric(genename_index)
 
 intersectinggenes<-Genesinmodules[genename_index,]
 
+intertable<-table(intersectinggenes$Genes, intersectinggenes$Module)
+write.table(intertable, file = "intersectinggenes_table.txt")
+
 ##Extract modules for genes that don't have overlap across modules and load in genes that have multiple modules. Combine the two data 
 #frames
+
+#write intersecting genes
+write.csv(intersectinggenes, file = "intersectinggenes.txt")
 #Load in genes that don't overlap across modules (this was manually done using excel)
-nonmultimodule_genes <- read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/nonmultimodule_genes.csv", sep="")
+nonmultimodule_genes <- read.csv("~/Desktop/PatelLab/NewAnalysis/Deconvolution/nonmultimodule_genes.csv", sep="")
 nonmultigenes<-nonmultimodule_genes$Genes
 
 for(x in 1:length(nonmultigenes)){
@@ -81,7 +87,7 @@ for(x in 1:length(nonmultigenes)){
   }
 }
 
-multimodule_genes <- read.csv("~/Desktop/PatelLab/Analysis_Results/Deconvolution/multimodule_genes.csv", sep="")
+multimodule_genes <- read.csv("~/Desktop/PatelLab/NewAnalysis/Deconvolution/multimodule_genes.csv", sep="")
 nonmulti<-nonmulti[!duplicated(nonmulti$Genes),]
 nonmulti<-nonmulti[,-2]
 
@@ -91,32 +97,39 @@ modules<-rbind(nonmulti,multi)
 row.names(modules)<-modules$Genes
 modules<-modules[-1]
 
-#Extract class data for samples
-bulkdataclass<-data.frame(samples$class)
-row.names(bulkdataclass)<-row.names(samples)
-colnames(bulkdataclass)<-"TumorClass"
-
-#hongkong class data
+#combined class data
 hkclass<-samplesheet$class
 hkclass<-as.data.frame(hkclass)
 names(hkclass)<-"TumorClass"
 row.names(hkclass)<-row.names(samplesheet)
-
-#combine class data from both data sets
-bulkdataclass<-rbind(bulkdataclass, hkclass)
+bulkdataclass<-hkclass
 
 
+
+#Heat Map
+library(pheatmap)
+library(RColorBrewer)
+breaks <- seq(-2, 2, length = 16)
+color <- colorRampPalette(rev(brewer.pal(11,'RdBu')))(length(breaks))
+annoCol<-list(TumorClass=c(A='#28A860', B ='#0042ED', C='#FE4733'))
+pheatmap(modulegenes_data, annotation_col = bulkdataclass, annotation_row = modules, show_rownames = F, show_colnames = F, scale = "row",
+         color= color,breaks = breaks, annotation_colors = annoCol)
 
 #load in single cell data after subtype clustering
-load("~/Desktop/PatelLab/Analysis_Results/Deconvolution/subtypecluster_cells.rda")
+load("~/Desktop/PatelLab/NewAnalysis/subtypecluster_cells.rda")
 
 #Load in single cell data matrix
+subclustcells<-subset(subclustcells,cells=colnames(subclustcells)[subclustcells$TumorType!="Control"])
+subclustcells<-subset(subclustcells,cells=colnames(subclustcells)[subclustcells$subtypecluster!=4])
+
 immunecellscounts <- as.matrix(Seurat::GetAssayData(subclustcells, slot = "counts"))
 
 
 #cell type labels vector
 #load in cluster data
 celltype<-subclustcells$subtypecluster
+celltype<-gsub("^", "C", celltype)
+
 
 #cell state label vector
 cellstate<-subclustcells$TumorType
@@ -125,7 +138,6 @@ cellstate<-subclustcells$TumorType
 ##Subset the single cell data by the genes in the modules. Not all genes in single cell data were 
 #included in modules by WGCNA.
 subsetgenes<-unique(Genesinmodules$Genes)
-immunecellscounts <- as.matrix(Seurat::GetAssayData(subclustcells, slot = "counts"))
 #create index of genes to subset matrix
 geneindex <- ""
 matrixgenes<-row.names(immunecellscounts)
@@ -136,17 +148,67 @@ for(x in 1:length){
 geneindex<-geneindex[-1]
 geneindex<-as.numeric(geneindex)
 subset.matrix <- immunecellscounts[geneindex, ] # Pull the raw expression matrix from the original Seurat object containing only the genes of interest
+#determine whether there are any columns with zero expression
+zero<-""
+for(x in 1:ncol(subset.matrix)){
+  vec<-subset.matrix[,x]
+  value<-""
+  for(y in 1:length(vec)){ #does the column have all missing values?
+    if(vec[y]==0){
+      value<-c(value, 1)
+    } else {
+      value<-c(value, 0)
+    }
+  }
+  value<-as.numeric(value[-1])
+  if(sum(value)==length(value)){
+    zero<-c(zero, 1) #1 indicates presence of all missing values.
+  }else {
+    zero<-c(zero, 0)
+  }
+}
 
+zero<-as.numeric(zero[-1]) #zero vec indicates columns with no expression
+
+#remove columns with zero expression
+noexpr<-which(zero == 1)
+#subset.matrix<-subset.matrix[,-noexpr]
+#celltype <- celltype[-noexpr]
 
 ###Bayes Prism##########################################################################################
 ########################################################################################################
-library(BayesPrism)
+#attempts to use BayesPrism cloud computing server ##for some reason believes multiple cell states per cell type
+#nrow(subset.matrix)
+#unique(row.names(subset.matrix))
+#inter<-intersect(row.names(subset.matrix), row.names(data_GS))
+#data_GS<-data_GS[row.names(data_GS)%in%inter,]
+
+#table(cellstate,celltype)
+#which(colnames(subset.matrix)=="AAACCTGAGGCTCAGA.1_1")
+#colnames(data_GS)
+#celltypedf[,1]
+
+#write.table(data_GS, file = "bulkdataDF.tsv", sep = "\t")
+#write.table(subset.matrix, file = "sc_matrix.tsv", sep = "\t")
 
 ##need to split up cell states within the cell types
 
 for(x in 1:length(cellstate)){
   cellstate[x]<-paste0(celltype[x],"_",cellstate[x])
 }
+#celltypedf<-data.frame(cellstate,celltype, "tumor_state" = rep(0, length(cellstate)))
+#row.names(celltypedf)<-colnames(subset.matrix)
+#row.names(celltypedf)<-gsub("-", ".", row.names(celltypedf))
+#write.csv(celltypedf, "celltypedf.csv")
+
+
+#table(celltypedf$cellstate,celltypedf$celltype)
+library("devtools");
+library(BayesPrism)
+
+
+
+
 
 table(cbind.data.frame(cellstate, celltype))
 
@@ -217,7 +279,7 @@ sc.dat.filtered.pc <-  select.gene.type (sc.dat.filtered,
 diff.exp.stat <- get.exp.stat(sc.dat=sc.dat.filtered.pc[,colSums(sc.dat.filtered.pc>0)>3],# filter genes to reduce memory use
                               cell.type.labels=celltype,
                               cell.state.labels=cellstate,
-                              psuedo.count=0.1, #a numeric value used for log2 transformation. =0.1 for 10x data, =10 for smart-seq. Default=0.1.
+                              pseudo.count=0.1, #a numeric value used for log2 transformation. =0.1 for 10x data, =10 for smart-seq. Default=0.1.
                               cell.count.cutoff=50, # a numeric value to exclude cell state with number of cells fewer than this value for t test. Default=50.
                               n.cores=1 #number of threads
 )
